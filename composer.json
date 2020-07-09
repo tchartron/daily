@@ -1,0 +1,24 @@
+{
+    "name": "tchartron/daily",
+    "description": "Summary of clockify timers for yesterday",
+    "require": {
+        "guzzlehttp/guzzle": "^6.5",
+        "vlucas/phpdotenv": "^4.1",
+        "league/climate": "^3.5",
+        "league/container": "^3.3",
+        "nesbot/carbon": "^2.32"
+    },
+    "require-dev": {
+    },
+    "autoload": {
+        "psr-4": {
+            "Clockify\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Thomas Chartron",
+            "email": "thomas.chartron@gmail.com"
+        }
+    ]
+}

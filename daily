@@ -1,0 +1,86 @@
+#!/usr/bin/env php
+<?php
+require_once 'vendor/autoload.php';
+
+$container = new League\Container\Container;
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__); // Dotenv removed constructor in 3.0.0
+$dotenv->load();
+
+// $container->add('climate', (new League\CLImate\CLImate()));
+$container->add('climate', League\CLImate\CLImate::class);
+$climate = $container->get('climate');
+
+$climate->arguments->add([
+    'sms' => [
+        'prefix'      => 's',
+        'longPrefix'  => 'sms',
+        'description' => 'Send report via SMS',
+        'noValue'     => true,
+    ],
+    'verbose' => [
+        'prefix'      => 'v',
+        'longPrefix'  => 'verbose',
+        'description' => 'Verbose output',
+        'noValue'     => true,
+    ],
+    'help' => [
+        'prefix'      => 'h',
+        'longPrefix'  => 'help',
+        'description' => 'Prints a usage statement',
+        'noValue'     => true,
+    ],
+]);
+$climate->arguments->parse();
+
+// putenv("DEBUG=" . $climate->arguments->defined('verbose'));
+
+if ($climate->arguments->defined('help')) {
+    $climate->usage();
+    exit;
+}
+
+$container->add('guzzle-clockify', \GuzzleHttp\Client::class)->addArgument([
+    'base_uri' => getenv('CLOCKIFY_API_URI'),
+    'headers' => [
+        'content-type' => "application/json",
+        'X-Api-Key' => getenv('CLOCKIFY_API_TOKEN')
+    ],
+    'debug' => getenv('DEBUG')
+]);
+$message = "";
+\Carbon\Carbon::setLocale('fr');
+$yesterday = \Carbon\Carbon::yesterday();
+$today = \Carbon\Carbon::today();
+
+$clockify = new Clockify\Clockify\ClockifyApi($container->get('guzzle-clockify'));
+$user_id = $clockify->getUser()->id;
+$workspace_id = $clockify->getWorkspace()[0]->id; // 1 is user personnal workspace
+$climate->blue()->out(sprintf("Fetch Clockify user id and workspace id : %s %s", $user_id, $workspace_id));
+$yesterday_timers = $clockify->getTimersBetween($workspace_id, $user_id, $yesterday->toISOString(), $today->toISOString());
+if(!is_array($yesterday_timers) || empty($yesterday_timers)) {
+    $climate->red()->out("No timers found for yesterday nightmares");
+    exit(1);
+}
+$climate->br();
+$climate->lightGreen()->out(sprintf("%d timers found between %s and %s", count($yesterday_timers), $yesterday->isoFormat('dddd D MMMM YYYY, kk:mm:ss'), $today->isoFormat('dddd D MMMM YYYY, kk:mm:ss')));
+$climate->br();
+foreach ($yesterday_timers as $timer) {
+    $climate->lightGreen(sprintf("→ %s | 🕒 %s", $timer->description, \Carbon\CarbonInterval::make($timer->timeInterval->duration)->forHumans(['short' => true])));
+    $message .= sprintf("→ %s | %s", $timer->description, \Carbon\CarbonInterval::make($timer->timeInterval->duration)->forHumans(['short' => true])).PHP_EOL;
+}
+
+if($climate->arguments->defined('sms')) {
+    $client = new \GuzzleHttp\Client(['base_uri' => getenv('FREE_SMS_URI')]);
+    $res = $client->request('GET', getenv('FREE_SMS_ENDPOINT'), [
+        'query' => [
+            'user' => getenv('FREE_SMS_USER'),
+            'pass' => getenv('FREE_SMS_PASS'),
+            'msg' => $message,
+        ]
+    ]);
+}
+
+$climate->br();
+$climate->blue()->out("👋🏼 👋🏼 👋🏼 👋🏼 👋🏼 👋🏼 👋🏼");
+exit(0);
