@@ -28,5 +28,5 @@ docker container run --rm -v $(pwd):/daily/ php:7.4-cli /bin/bash -c "curl -sS h
 ```
 
 ## Improvements
-- Allow for date
+- Specify date
 - On Monday use last Friday instead of Yesterday
